@@ -1,0 +1,343 @@
+
+
+● Perfect! Let me explain the Clean Architecture pattern and why MoviedbDatasource extends MoviesDatasource:
+
+  🏗️ Clean Architecture Layers
+
+  Domain Layer (/lib/domain/):
+  - Contains business rules and entities
+  - Defines contracts (interfaces/abstract classes)
+  - Independent of external frameworks, databases, or APIs
+  - The "core" of your application
+
+  Infrastructure Layer (/lib/infrastructure/):
+  - Contains concrete implementations
+  - Handles external concerns (APIs, databases, file systems)
+  - Depends on domain layer contracts
+
+  🔗 Why Extend MoviesDatasource?
+
+  // Domain layer - Contract/Interface
+  abstract class MoviesDatasource {
+    Future<List<Movie>> getNowPlaying({int page = 1});
+  }
+
+  // Infrastructure layer - Implementation
+  class MoviedbDatasource extends MoviesDatasource {
+    @override
+    Future<List<Movie>> getNowPlaying({int page = 1}) async {
+      // Implementation details: HTTP calls, JSON parsing, etc.
+      return [];
+    }
+  }
+
+  🎯 Benefits of This Pattern:
+
+  1. Dependency Inversion: Domain doesn't depend on infrastructure
+  2. Testability: You can mock MoviesDatasource easily
+  3. Flexibility: Switch data sources (API → Local DB) without changing domain
+  4. Separation of Concerns: Business logic separate from implementation details
+
+  🔄 Example Use Cases:
+
+  // You could have multiple implementations:
+  class MoviedbDatasource extends MoviesDatasource { /* API calls */ }
+  class LocalMoviesDatasource extends MoviesDatasource { /* SQLite */ }
+  class MockMoviesDatasource extends MoviesDatasource { /* Testing */ }
+
+  🎭 Real-World Analogy:
+
+  Think of MoviesDatasource as a contract (like "I need someone who can get movies"). The infrastructure implementations are contractors who fulfill that
+  contract in different ways:
+  - MovieDB API contractor
+  - Local database contractor
+  - Mock data contractor
+
+  This way, your business logic doesn't care how movies are fetched, just that they can be fetched according to the contract!
+
+> in backend it is the same? domain and infrastructure  ?
+
+● Yes! Clean Architecture is language and platform agnostic - the same principles apply to backend, frontend, mobile, and desktop applications.
+
+  🏗️ Backend Clean Architecture (Same Pattern)
+
+  Domain Layer (/domain/):
+
+  // Java/Spring example
+  public interface UserRepository {
+      User findById(Long id);
+      void save(User user);
+  }
+
+  public class User {
+      private String email;
+      private String name;
+      // Business logic methods
+  }
+
+  Infrastructure Layer (/infrastructure/):
+
+  // Concrete implementation
+  @Repository
+  public class JpaUserRepository implements UserRepository {
+      @Override
+      public User findById(Long id) {
+          // JPA/Database implementation
+          return userJpaRepository.findById(id);
+      }
+  }
+
+  🔄 Cross-Platform Examples:
+
+  Node.js/TypeScript:
+
+  // Domain
+  interface PaymentGateway {
+    processPayment(amount: number): Promise<PaymentResult>;
+  }
+
+  // Infrastructure
+  class StripePaymentGateway implements PaymentGateway {
+    async processPayment(amount: number): Promise<PaymentResult> {
+      // Stripe API calls
+    }
+  }
+
+  C#/.NET:
+
+  // Domain
+  public interface IEmailService {
+      Task SendEmailAsync(string to, string subject, string body);
+  }
+
+  // Infrastructure
+  public class SendGridEmailService : IEmailService {
+      public async Task SendEmailAsync(string to, string subject, string body) {
+          // SendGrid implementation
+      }
+  }
+
+  🎯 Universal Benefits:
+
+  1. Framework Independence: Switch from Express to Fastify, Spring to Quarkus
+  2. Database Agnostic: Move from PostgreSQL to MongoDB without domain changes
+  3. Testing: Mock external services easily
+  4. Team Collaboration: Domain experts focus on business rules, infra experts on implementation
+
+  🏢 Backend-Specific Advantages:
+
+  - Microservices: Each service has its own clean boundaries
+  - Multiple Data Sources: API calls, databases, message queues
+  - External Integrations: Payment gateways, email services, third-party APIs
+
+  The pattern is identical - only the technology stack changes! 🚀
+
+> can you explain to me this code inside movies_providers ?
+
+
+  🔧 Riverpod Providers Explained
+
+  1. Repository Provider (movies_repository_provider.dart:6-8):
+
+  final movieRepositoryProvider = Provider((ref) {
+    return MovieRepositoryImpl(MoviedbDatasource());
+  });
+  What it does:
+  - Creates a singleton repository instance
+  - Immutable provider (comment: "este repositorio es inmutable")
+  - Dependency Injection: Provides MovieRepositoryImpl with MoviedbDatasource
+
+  2. Movies State Provider (movies_providers.dart:5-9):
+
+  final nowPlayingMoviesProvider =
+      StateNotifierProvider<MoviesNotifier, List<Movie>>((ref) {
+        final fetchMoreMovies = ref.watch(movieRepositoryProvider).getNowPlaying;
+        return MoviesNotifier(fetchMoreMovies: fetchMoreMovies);
+      });
+  What it does:
+  - Creates a stateful provider that manages List<Movie>
+  - Watches the repository provider for dependency
+  - Extracts the getNowPlaying method and passes it to the notifier
+
+  3. MoviesNotifier Class (movies_providers.dart:13-23):
+
+  class MoviesNotifier extends StateNotifier<List<Movie>> {
+    int currentPage = 0;
+    MovieCallback fetchMoreMovies;
+
+    MoviesNotifier({required this.fetchMoreMovies}) : super([]);
+
+    Future<void> loadNextPage() async {
+      currentPage++;
+      final List<Movie> movies = await fetchMoreMovies(page: currentPage);
+      state = [...state, ...movies]; // Pagination logic!
+    }
+  }
+
+  🧩 How It All Works Together:
+
+  Data Flow:
+
+  UI Widget
+    ↓ (consumes)
+  nowPlayingMoviesProvider
+    ↓ (watches)
+  movieRepositoryProvider
+    ↓ (creates)
+  MovieRepositoryImpl
+    ↓ (uses)
+  MoviedbDatasource
+    ↓ (calls)
+  TheMovieDB API
+
+  Key Concepts:
+
+  1. ref.watch(): Creates dependency between providers
+  2. StateNotifier: Manages mutable state with immutable updates
+  3. MovieCallback: Type alias for cleaner function signatures
+  4. Pagination: state = [...state, ...movies] appends new movies to existing list
+
+  Dart Language Features:
+
+  - Spread Operator (...): Merges lists immutably
+  - Function Types: MovieCallback as parameter
+  - Super Constructor: super([]) initializes with empty list
+
+  🎯 Benefits:
+
+  - Reactive: UI rebuilds automatically when state changes
+  - Testable: Easy to mock providers
+  - Scalable: Add more movie providers easily
+  - Performance: Only rebuilds affected widgets
+
+  This is clean, functional state management with proper separation of concerns! 🚀
+
+> why to use this and not to call directly the api that load the movies ? also what is ref ?
+
+● Great questions! Let me explain why this pattern is better than direct API calls and what ref is.
+
+  🚫 Direct API Call (BAD Approach):
+
+  class MovieScreen extends StatefulWidget {
+    @override
+    _MovieScreenState createState() => _MovieScreenState();
+  }
+
+  class _MovieScreenState extends State<MovieScreen> {
+    List<Movie> movies = [];
+    bool isLoading = false;
+
+    @override
+    void initState() {
+      super.initState();
+      loadMovies(); // Direct API call
+    }
+
+    Future<void> loadMovies() async {
+      setState(() => isLoading = true);
+
+      // Direct HTTP call - PROBLEMS HERE!
+      final response = await http.get(
+        'https://api.themoviedb.org/3/movie/now_playing?api_key=...'
+      );
+      final data = json.decode(response.body);
+
+      setState(() {
+        movies = data['results'].map((m) => Movie.fromJson(m)).toList();
+        isLoading = false;
+      });
+    }
+  }
+
+  🔥 Problems with Direct API Calls:
+
+  1. Code Duplication: Every widget makes its own API calls
+  2. No Caching: Same data fetched multiple times
+  3. No State Sharing: Different widgets can't share the same movies list
+  4. Testing Nightmare: Hard to mock HTTP calls
+  5. Memory Leaks: setState on disposed widgets
+  6. No Error Handling: Crashes on network errors
+  7. Performance: Unnecessary rebuilds and API calls
+
+  ✅ Riverpod Provider Pattern (GOOD Approach):
+
+  // Multiple widgets can use the same data
+  class MovieScreen extends ConsumerWidget {
+    @override
+    Widget build(BuildContext context, WidgetRef ref) {
+      final movies = ref.watch(nowPlayingMoviesProvider);
+      // No API call here - just consumes state!
+      return ListView.builder(...);
+    }
+  }
+
+  class MovieCounter extends ConsumerWidget {
+    @override
+    Widget build(BuildContext context, WidgetRef ref) {
+      final movies = ref.watch(nowPlayingMoviesProvider);
+      return Text('${movies.length} movies'); // Same data, no extra API call!
+    }
+  }
+
+  🎯 Benefits of Provider Pattern:
+
+  1. Single Source of Truth: One place manages movie state
+  2. Automatic Caching: Data fetched once, shared everywhere
+  3. Reactive UI: Widgets rebuild automatically when data changes
+  4. Easy Testing: Mock providers instead of HTTP calls
+  5. Memory Safe: No setState on disposed widgets
+  6. Error Handling: Centralized error management
+  7. Performance: Efficient state updates and rebuilds
+
+  🤔 What is ref?
+
+  ref is Riverpod's dependency injection container - think of it as a "magical box" that manages all your app's state and dependencies.
+
+  ref Methods:
+
+  // 1. WATCH - Creates dependency + rebuilds when state changes
+  final movies = ref.watch(nowPlayingMoviesProvider);
+
+  // 2. READ - Gets current value without creating dependency
+  final currentMovies = ref.read(nowPlayingMoviesProvider);
+
+  // 3. LISTEN - Execute side effects when state changes
+  ref.listen(nowPlayingMoviesProvider, (previous, next) {
+    if (next.isEmpty) showError();
+  });
+
+  Real-World Analogy:
+
+  Think of ref like a smart waiter in a restaurant:
+
+  - ref.watch(): "Tell me immediately when my order is ready, and keep me updated"
+  - ref.read(): "What's the current status of my order?" (one-time check)
+  - ref.listen(): "Do something special when my order status changes"
+
+  🏗️ Architecture Comparison:
+
+  Without Providers (Chaos):
+
+  Widget A → Direct API Call → Movie Data
+  Widget B → Direct API Call → Same Movie Data (duplicate!)
+  Widget C → Direct API Call → Same Movie Data (waste!)
+
+  With Providers (Clean):
+
+  Widget A ↘
+  Widget B → ref.watch() → Provider → Single API Call → Movie Data
+  Widget C ↗
+
+  🚀 Dart Learning Point:
+
+  Function References: In ref.watch(movieRepositoryProvider).getNowPlaying, we're passing the method reference (not calling it). This is a powerful Dart
+  feature for functional programming!
+
+  // Method reference (function object)
+  final fetchFunction = ref.watch(movieRepositoryProvider).getNowPlaying;
+
+  // Later, call it with parameters
+  final movies = await fetchFunction(page: 1);
+
+  The provider pattern is industry standard because it scales beautifully as your app grows! 🎯
+
