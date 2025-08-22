@@ -2,17 +2,37 @@ import 'package:cinemapedia/domain/entities/movie.dart';
 import 'package:cinemapedia/presentation/providers/movies/movies_repository_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-final nowPlayingMoviesProvider =
-    StateNotifierProvider<MoviesNotifier, List<Movie>>((ref) {
-      final fetchMoreMovies = ref.watch(movieRepositoryProvider).getNowPlaying;
-      return MoviesNotifier(fetchMoreMovies: fetchMoreMovies);
-    });
+// a javascript example to understand this part of the code
+// const nowPlayingMoviesProvider = new StateNotifierProvider((ref) => {
+//   const movieRepository = ref.watch(movieRepositoryProvider);
 
+//   const fetchMoreMovies = movieRepository.getNowPlaying;
+
+//   const moviesNotifier = new MoviesNotifier({ fetchMoreMovies });
+
+//   return moviesNotifier;
+// });
+
+// diferentes formas de escribirlo
+
+final nowPlayingMoviesProvider =
+    StateNotifierProvider<MoviesNotifier, List<Movie>>(
+      (ref) => MoviesNotifier(
+        fetchMoreMovies: ref.watch(movieRepositoryProvider).getNowPlaying,
+      ),
+    );
+
+// ✅ función separada
+MoviesNotifier createPopularMoviesNotifier(ref) {
+  final fetchMoreMovies = ref.watch(movieRepositoryProvider).getPopular;
+  return MoviesNotifier(fetchMoreMovies: fetchMoreMovies);
+}
+
+// ✅ provider usando la función
 final popularMoviesProvider =
-    StateNotifierProvider<MoviesNotifier, List<Movie>>((ref) {
-      final fetchMoreMovies = ref.watch(movieRepositoryProvider).getPopular;
-      return MoviesNotifier(fetchMoreMovies: fetchMoreMovies);
-    });
+    StateNotifierProvider<MoviesNotifier, List<Movie>>(
+      createPopularMoviesNotifier,
+                                                                      );
 
 //upcomingMoviesProvider
 final upcomingMoviesProvider =
